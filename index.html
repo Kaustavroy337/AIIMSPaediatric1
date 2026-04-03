@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hospital TV Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --header-teal: #0d9488;
+            --tile-bg: #1e293b;
+            --tile-header: #334155;
+            --now-serving: #fbbf24;
+            --next-label: #cbd5e1;
+            --next-bg: #1e3a8a;
+            --text-white: #f8fafc;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Outfit', 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-white);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- Header Section --- */
+        header {
+            background-color: var(--header-teal);
+            height: 12vh;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 40px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            border-bottom: 2px solid rgba(255,255,255,0.1);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .logo {
+            height: 60px;
+            width: auto;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+        }
+
+        .dept-title {
+            font-size: 2.8rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .header-right {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 4px;
+        }
+
+        .now-serving-banner {
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+
+        #clock {
+            font-size: 1.4rem;
+            font-weight: 600;
+            opacity: 0.9;
+        }
+
+        /* --- Main Grid Section --- */
+        main {
+            flex: 1;
+            padding: 2vh 40px;
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 20px;
+            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+        }
+
+        .tile {
+            background-color: var(--tile-bg);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.05);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        .tile-header {
+            background-color: var(--tile-header);
+            padding: 15px;
+            text-align: center;
+            font-size: 1.8rem;
+            font-weight: 700;
+            border-bottom: 2px solid rgba(0,0,0,0.2);
+        }
+
+        .serving-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            position: relative;
+        }
+
+        .serving-label {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--next-label);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .serving-number {
+            color: var(--now-serving);
+            font-weight: 800;
+            text-align: center;
+            line-height: 1;
+            /* Font size adjusted via JavaScript */
+        }
+
+        .next-container {
+            background-color: var(--next-bg);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .next-label {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--next-label);
+            text-align: center;
+            text-transform: uppercase;
+        }
+
+        .next-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .next-item {
+            font-size: 2.2rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+        }
+
+        /* --- Footer Section --- */
+        footer {
+            height: 8vh;
+            background-color: var(--header-teal);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-top: 2px solid rgba(255,255,255,0.1);
+        }
+
+        .footer-text {
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        /* --- Animations & Utilities --- */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .flicker {
+            animation: flicker 0.5s infinite alternate;
+        }
+
+        @keyframes flicker {
+            from { opacity: 1; }
+            to { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-left">
+            <img src="assets/logo.png" alt="Logo" class="logo">
+            <div id="dept-name" class="dept-title">LOADING...</div>
+        </div>
+        <div class="header-right">
+            <div id="status-label" class="now-serving-banner">Now Serving</div>
+            <div id="clock">--:--:-- --</div>
+        </div>
+    </header>
+
+    <main id="main-grid">
+        <!-- Tiles will be injected here -->
+    </main>
+
+    <footer>
+        <div id="footer-text" class="footer-text">Please Wait for Your Token Number to be Called</div>
+    </footer>
+
+    <script>
+        // --- CONFIG ---
+        const CONFIG = {
+            SUPABASE_URL: 'https://oofytczjvpkjbivhwhca.supabase.co',
+            SUPABASE_KEY: 'sb_publishable_IL4q6Yn14gYVadx-qbXxkg_QV92YPpe',
+            DEPARTMENT_ID: 'd55ec19e-759e-48ae-a8c6-380cf9650ca7', // Change this for different departments
+            ROOMS_PER_PAGE: 6,
+            SCROLL_INTERVAL: 30000,
+            LANG_INTERVAL: 15000,
+            REFRESH_INTERVAL: 4000
+        };
+
+        const TRANSLATIONS = {
+            en: {
+                nowServing: "Now Serving",
+                next: "Next",
+                footer: "Please Wait for Your Token Number to be Called",
+                room: "Room"
+            },
+            hi: {
+                nowServing: "अभी बुलाया गया",
+                next: "अगला",
+                footer: "कृपया अपने टोकन नंबर बुलाए जाने की प्रतीक्षा करें",
+                room: "कमरा"
+            }
+        };
+
+        function toHindiDigits(n) {
+            const hindiDigits = ['०', '१', '२', '३', '४', '५', '६', '७', '८', '९'];
+            return String(n).split('').map(char => hindiDigits[parseInt(char)] || char).join('');
+        }
+
+        // --- STATE ---
+        let currentLang = 'en';
+        let currentPage = 0;
+        let departmentID = CONFIG.DEPARTMENT_ID;
+        let rooms = [];
+        let tokens = [];
+        let departmentName = '';
+        let isInitialLoad = true;
+        let lastTokensJson = '';
+
+        const supabaseClient = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
+
+        // --- DATA FETCHING ---
+        
+        // Fetch Rooms and Department Info (Cached for 30 mins)
+        async function fetchRoomsAndDept() {
+            try {
+                // Fetch Department Name
+                const { data: dept } = await supabaseClient.from('departments').select('department_name').eq('department_id', departmentID).single();
+                if (dept) departmentName = dept.department_name;
+
+                // Fetch All Rooms for this department
+                const { data: roomsData } = await supabaseClient.from('rooms').select('*').eq('department_id', departmentID).order('room_number');
+                rooms = roomsData || [];
+                
+                if (isInitialLoad) {
+                    await fetchTokens(); // Ensure we have tokens before first render
+                    isInitialLoad = false;
+                }
+                render();
+            } catch (err) {
+                console.error("Room Fetch Error:", err);
+            }
+        }
+
+        // Fetch Tokens (Primary source is Real-time, this is for fallback/initial)
+        async function fetchTokens() {
+            try {
+                const { data: tokensData } = await supabaseClient
+                    .from('token_details')
+                    .select('*')
+                    .eq('department_id', departmentID)
+                    .in('status', ['in_consultation', 'waiting'])
+                    .order('token_number');
+                
+                const newTokens = tokensData || [];
+                const newTokensJson = JSON.stringify(newTokens);
+                
+                // Only render if data actually changed to avoid flicker
+                if (newTokensJson !== lastTokensJson) {
+                    tokens = newTokens;
+                    lastTokensJson = newTokensJson;
+                    render();
+                }
+            } catch (err) {
+                console.error("Token Fetch Error:", err);
+            }
+        }
+
+        // --- UI RENDERING ---
+        function updateClock() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+            document.getElementById('clock').textContent = timeStr;
+        }
+
+        function getDynamicFontSize(tokenString) {
+            if (tokenString.length <= 3) return '6rem';
+            if (tokenString.length <= 6) return '4.5rem';
+            if (tokenString.length <= 10) return '3.5rem';
+            return '2.5rem';
+        }
+
+        function render() {
+            if (isInitialLoad) return; // Wait for initial room + token fetch
+
+            const t = TRANSLATIONS[currentLang];
+            
+            // Header
+            document.getElementById('dept-name').textContent = departmentName || "OPD DASHBOARD";
+            document.getElementById('status-label').textContent = t.nowServing;
+            document.getElementById('footer-text').textContent = t.footer;
+
+            // Pagination Logic
+            const activeRooms = rooms.filter(r => r.status === 'active');
+            const totalPages = Math.ceil(activeRooms.length / CONFIG.ROOMS_PER_PAGE);
+            if (currentPage >= totalPages) currentPage = 0;
+            
+            const startIndex = currentPage * CONFIG.ROOMS_PER_PAGE;
+            const roomsToShow = activeRooms.slice(startIndex, startIndex + CONFIG.ROOMS_PER_PAGE);
+
+            const grid = document.getElementById('main-grid');
+            
+            // Use a fragment to render off-screen then replace to minimize flicker
+            const fragment = document.createDocumentFragment();
+
+            roomsToShow.forEach(room => {
+                const servingInRoom = tokens.filter(tok => tok.room_id === room.room_id && tok.status === 'in_consultation');
+                const nextInRoom = tokens.filter(tok => tok.room_id === room.room_id && tok.status === 'waiting').slice(0, 3);
+
+                const servingNumbers = servingInRoom.map(tok => currentLang === 'hi' ? toHindiDigits(tok.token_number) : tok.token_number).join(', ') || '---';
+                
+                const tile = document.createElement('div');
+                tile.className = 'tile';
+                
+                const roomLabel = currentLang === 'hi' ? `${t.room} ${toHindiDigits(room.room_number)}` : `${t.room} ${room.room_number}`;
+
+                tile.innerHTML = `
+                    <div class="tile-header">${roomLabel}</div>
+                    <div class="serving-container">
+                        <div class="serving-label">${t.nowServing}</div>
+                        <div class="serving-number" style="font-size: ${getDynamicFontSize(servingNumbers)}">
+                            ${servingNumbers}
+                        </div>
+                    </div>
+                    <div class="next-container">
+                        <div class="next-label">${t.next}</div>
+                        <div class="next-list">
+                            ${nextInRoom.map(tok => `
+                                <div class="next-item">${currentLang === 'hi' ? toHindiDigits(tok.token_number) : tok.token_number}</div>
+                            `).join('')}
+                            ${nextInRoom.length === 0 ? '<div class="next-item">---</div>' : ''}
+                        </div>
+                    </div>
+                `;
+                fragment.appendChild(tile);
+            });
+
+            // Fast DOM replacement
+            grid.innerHTML = '';
+            grid.appendChild(fragment);
+        }
+
+        // --- INTERVALS ---
+        setInterval(updateClock, 1000);
+        
+        setInterval(() => {
+            currentLang = currentLang === 'en' ? 'hi' : 'en';
+            render();
+        }, CONFIG.LANG_INTERVAL);
+
+        setInterval(() => {
+            const activeRooms = rooms.filter(r => r.status === 'active');
+            const totalPages = Math.ceil(activeRooms.length / CONFIG.ROOMS_PER_PAGE);
+            if (totalPages > 1) {
+                currentPage = (currentPage + 1) % totalPages;
+                render();
+            }
+        }, CONFIG.SCROLL_INTERVAL);
+
+        // Fallback polling (15s)
+        setInterval(fetchTokens, 15000);
+        
+        // Cache Refresh for Rooms (30 mins)
+        setInterval(fetchRoomsAndDept, 1800000);
+
+        // Real-time updates (Primary source)
+        supabaseClient.channel('token-updates')
+            .on('postgres_changes', { 
+                event: '*', 
+                table: 'token_details', 
+                filter: `department_id=eq.${departmentID}` 
+            }, (payload) => {
+                console.log('Real-time update received:', payload);
+                fetchTokens(); // Refresh list on any change
+            })
+            .subscribe();
+
+        // Initial Boot
+        updateClock();
+        fetchRoomsAndDept();
+
+    </script>
+</body>
+</html>
