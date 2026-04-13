@@ -41,6 +41,15 @@
             flex-direction: column;
         }
 
+        .lang-transition {
+            transition: transform 0.01s ease-in-out, opacity 0.01s ease-in-out;
+        }
+
+        .lang-hidden {
+            transform: translateY(-5px);
+            opacity: 0;
+        }
+
         /* --- Header --- */
         header {
             background-color: var(--header-teal);
@@ -86,15 +95,7 @@
             font-size: 1.4rem;
         }
 
-        /* --- Main --- */
-        main {
-            flex: 1;
-            padding: 2vh 40px;
-            display: grid;
-            grid-template-columns: repeat(6, 1fr);
-            gap: 20px;
-            background: linear-gradient(180deg, #F4F5EA 0%, #EAC686 100%);
-        }
+        /* --- Main Removed from here and moved to Transitions section --- */
 
         .tile {
             background-color: var(--tile-bg);
@@ -139,6 +140,29 @@
             font-weight: 800;
             text-align: center;
             line-height: 1;
+        }
+
+        /* --- Transitions --- */
+        main {
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+            background: linear-gradient(180deg, #F4F5EA 0%, #EAC686 100%);
+        }
+
+        #grid-wrapper {
+            display: flex;
+            height: 100%;
+            width: 200%;
+            transition: transform 1s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .grid-layer {
+            width: 50%;
+            height: 100%;
+            padding: 2vh 40px;
+            display: grid;
+            gap: 20px;
         }
 
         .next-container {
@@ -212,7 +236,12 @@
         </div>
     </header>
 
-    <main id="main-grid"></main>
+    <main>
+        <div id="grid-wrapper">
+            <div id="grid-primary" class="grid-layer"></div>
+            <div id="grid-secondary" class="grid-layer"></div>
+        </div>
+    </main>
 
     <footer>
         <div id="footer-text" class="footer-text">Please Wait for Your Token Number to be Called</div>
@@ -222,11 +251,13 @@
         const CONFIG = {
             SUPABASE_URL: 'https://oofytczjvpkjbivhwhca.supabase.co',
             SUPABASE_KEY: 'sb_publishable_IL4q6Yn14gYVadx-qbXxkg_QV92YPpe',
-            DEPARTMENT_ID: 'd55ec19e-759e-48ae-a8c6-380cf9650ca7',
+            DEPARTMENT_ID: '97cdc368-b349-493f-bb25-cf307efaa583',
             ROOMS_PER_PAGE: 6,
-            SCROLL_INTERVAL: 20000,
-            LANG_INTERVAL: 10000,
-            REFRESH_INTERVAL: 4000
+            GRID_COLUMNS: 6, // Number of columns in the grid
+            SCROLL_INTERVAL: 10000,
+            LANG_INTERVAL: 150000000,
+            POLLING_INTERVAL: 15000,
+            START_LANG: 'hi'
         };
 
         const TRANSLATIONS = {
@@ -245,11 +276,11 @@
         };
 
         function toHindiDigits(n) {
-            const hindiDigits = ['०','१','२','३','४','५','६','७','८','९'];
+            const hindiDigits = ['०', '१', '२', '३', '४', '५', '६', '७', '८', '९'];
             return String(n).split('').map(c => hindiDigits[parseInt(c)] || c).join('');
         }
 
-        let currentLang = 'en';
+        let currentLang = CONFIG.START_LANG;
         let currentPage = 0;
         let rooms = [];
         let tokens = [];
@@ -287,7 +318,7 @@
                 .from('token_details')
                 .select('*')
                 .eq('department_id', CONFIG.DEPARTMENT_ID)
-                .in('status', ['in_consultation', 'waiting'])
+                .in('status', ['in_consultation', 'waiting', 'pending', 'no_show'])
                 .order('token_number');
 
             const newJson = JSON.stringify(data || []);
@@ -305,22 +336,34 @@
         }
 
         function getDynamicFontSize(str) {
-            if (str.length <= 3) return '6rem';
-            if (str.length <= 6) return '4.5rem';
-            if (str.length <= 10) return '3.5rem';
-            return '2.5rem';
+            const len = str.length;
+            if (len <= 3) return '6.5rem';
+            if (len <= 5) return '5.5rem';
+            if (len <= 8) return '4.5rem';
+            if (len <= 12) return '3.5rem';
+            if (len <= 16) return '2.8rem';
+            return '2.2rem';
         }
 
-        function render() {
+        function getDeptFontSize(str) {
+            if (str.length > 40) return '1.8rem';
+            if (str.length > 25) return '2.2rem';
+            return '2.8rem';
+        }
+
+        function render(targetId = 'grid-primary') {
             if (isInitialLoad) return;
 
             const t = TRANSLATIONS[currentLang];
 
-            document.getElementById('dept-name').textContent = departmentName || "OPD DASHBOARD";
+            const deptTitle = document.getElementById('dept-name');
+            deptTitle.textContent = departmentName || "OPD DASHBOARD";
+            deptTitle.style.fontSize = getDeptFontSize(deptTitle.textContent);
+
             document.getElementById('status-label').textContent = t.nowServing;
             document.getElementById('footer-text').textContent = t.footer;
 
-            const activeRooms = rooms.filter(r => r.status === 'active');
+            const activeRooms = rooms.filter(r => r.status === 'active' && tokens.some(t => t.room_id === r.room_id));
             const totalPages = Math.ceil(activeRooms.length / CONFIG.ROOMS_PER_PAGE);
             if (currentPage >= totalPages) currentPage = 0;
 
@@ -329,12 +372,13 @@
                 (currentPage + 1) * CONFIG.ROOMS_PER_PAGE
             );
 
-            const grid = document.getElementById('main-grid');
+            const grid = document.getElementById(targetId);
+            grid.style.gridTemplateColumns = `repeat(${CONFIG.GRID_COLUMNS}, 1fr)`;
             const fragment = document.createDocumentFragment();
 
             roomsToShow.forEach(room => {
                 const serving = tokens.filter(t => t.room_id === room.room_id && t.status === 'in_consultation');
-                const next = tokens.filter(t => t.room_id === room.room_id && t.status === 'waiting').slice(0, 3);
+                const next = tokens.filter(t => t.room_id === room.room_id && ['waiting', 'pending', 'no_show'].includes(t.status)).slice(0, 3);
 
                 const servingNumbers = serving.map(t => t.token_number).join(', ') || '---';
 
@@ -342,17 +386,17 @@
                 tile.className = 'tile';
 
                 tile.innerHTML = `
-                    <div class="tile-header">Room ${room.room_number}</div>
+                    <div class="tile-header">${t.room} ${currentLang === 'hi' ? toHindiDigits(room.room_number) : room.room_number}</div>
                     <div class="serving-container">
                         <div class="serving-label">${t.nowServing}</div>
                         <div class="serving-number" style="font-size:${getDynamicFontSize(servingNumbers)}">
-                            ${servingNumbers}
+                            ${currentLang === 'hi' ? toHindiDigits(servingNumbers) : servingNumbers}
                         </div>
                     </div>
                     <div class="next-container">
                         <div class="next-label">${t.next}</div>
                         <div class="next-list">
-                            ${next.map(n => `<div class="next-item">${n.token_number}</div>`).join('') || '<div class="next-item">---</div>'}
+                            ${next.map(n => `<div class="next-item">${currentLang === 'hi' ? toHindiDigits(n.token_number) : n.token_number}</div>`).join('') || '<div class="next-item">---</div>'}
                         </div>
                     </div>
                 `;
@@ -363,8 +407,61 @@
             grid.appendChild(fragment);
         }
 
+        async function transitionPage() {
+            const activeRooms = rooms.filter(r => r.status === 'active' && tokens.some(t => t.room_id === r.room_id));
+            const totalPages = Math.ceil(activeRooms.length / CONFIG.ROOMS_PER_PAGE);
+            if (totalPages <= 1) return;
+
+            const nextPage = (currentPage + 1) % totalPages;
+
+            // Temporary override currentPage to render next page to secondary
+            const savedPage = currentPage;
+            currentPage = nextPage;
+            render('grid-secondary');
+            currentPage = savedPage;
+
+            const wrapper = document.getElementById('grid-wrapper');
+            wrapper.style.transform = 'translateX(-50%)';
+
+            setTimeout(() => {
+                currentPage = nextPage;
+                render('grid-primary'); // Update primary with new content
+                wrapper.style.transition = 'none';
+                wrapper.style.transform = 'none';
+                wrapper.offsetHeight; // trigger reflow
+                wrapper.style.transition = '';
+            }, 1000); // match CSS transition duration
+        }
+
         setInterval(updateClock, 1000);
-        setInterval(fetchTokens, 15000); // polling
+        setInterval(fetchTokens, CONFIG.POLLING_INTERVAL);
+
+        // Auto-scroll logic with smooth transition
+        setInterval(transitionPage, CONFIG.SCROLL_INTERVAL);
+
+        // Language switching logic with fast transition
+        setInterval(() => {
+            const wrapper = document.getElementById('grid-wrapper');
+            const header = document.querySelector('header');
+            const footer = document.querySelector('footer');
+            const elements = [wrapper, header, footer];
+
+            elements.forEach(el => {
+                el.classList.add('lang-transition');
+                el.classList.add('lang-hidden');
+            });
+
+            setTimeout(() => {
+                currentLang = currentLang === 'en' ? 'hi' : 'en';
+                render();
+                elements.forEach(el => el.classList.remove('lang-hidden'));
+
+                // Cleanup classes after animation
+                setTimeout(() => {
+                    elements.forEach(el => el.classList.remove('lang-transition'));
+                }, 10);
+            }, 10); // Ultra-fast fade out
+        }, CONFIG.LANG_INTERVAL);
 
         supabaseClient.channel('token-updates')
             .on('postgres_changes', {
@@ -378,4 +475,5 @@
     </script>
 
 </body>
+
 </html>
