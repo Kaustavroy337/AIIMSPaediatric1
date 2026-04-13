@@ -378,7 +378,7 @@
 
             roomsToShow.forEach(room => {
                 const serving = tokens.filter(t => t.room_id === room.room_id && t.status === 'in_consultation');
-                const next = tokens.filter(t => t.room_id === room.room_id && ['waiting', 'pending', 'no_show'].includes(t.status)).slice(0, 3);
+                const next = tokens.filter(t => t.room_id === room.room_id && ['waiting', 'pending'].includes(t.status)).slice(0, 3);
 
                 const servingNumbers = serving.map(t => t.token_number).join(', ') || '---';
 
