@@ -1,3 +1,9 @@
+<!-- 
+  HOSPITAL TV DASHBOARD
+  ---------------------
+  This is the main file for the Hospital TV Screen. It shows patients which room to go to.
+  It uses HTML for structure, CSS for design, and JavaScript for the "brains" or logic.
+-->
 <!DOCTYPE html>
 <html lang="en">
 
@@ -7,22 +13,34 @@
     <title>Hospital TV Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
+    <!-- Google Fonts: This makes the text look modern and professional -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Outfit:wght@400;600;700;800&display=swap"
         rel="stylesheet">
 
+    <!-- CSS (Styles): This section controls how the dashboard looks (colors, fonts, layout) -->
+
     <style>
         :root {
+            /* These are like variables - we define colors here once and use them throughout the file */
             --bg-dark: #0F1115;
+            /* Dark background color */
             --header-teal: #352024;
+            /* Dark red/brown for header and footer */
             --tile-bg: #1E2228;
+            /* Background for the room boxes */
             --tile-header: #AA410D;
+            /* Orange/Brown for the room header */
             --now-serving: #F8F9FA;
+            /* White for the main token number */
             --next-label: #7496A4;
+            /* Blueish grey for labels */
             --next-bg: #2D3748;
+            /* Darker grey for the 'Next' section */
             --text-white: #F8F9FA;
+            /* Standard white text */
         }
 
         * {
@@ -49,6 +67,10 @@
             transform: translateY(-5px);
             opacity: 0;
         }
+
+        /* --- HEADER SECTION STYLES --- 
+           Controls the top part of the screen where the logo and clock are located.
+        */
 
         /* --- Header --- */
         header {
@@ -95,6 +117,10 @@
             font-size: 1.4rem;
         }
 
+        /* --- ROOM TILE STYLES --- 
+           Controls the look of each individual room 'box' or 'tile' on the screen.
+        */
+
         /* --- Main Removed from here and moved to Transitions section --- */
 
         .tile {
@@ -119,6 +145,8 @@
 
         .serving-container {
             flex: 1;
+            min-height: 0;
+            /* Allows this container to shrink if needed to show the Next section */
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -142,6 +170,10 @@
             line-height: 1;
         }
 
+        /* --- ANIMATION & TRANSITION STYLES --- 
+           Controls how pages slide from left to right.
+        */
+
         /* --- Transitions --- */
         main {
             flex: 1;
@@ -160,17 +192,22 @@
         .grid-layer {
             width: 50%;
             height: 100%;
-            padding: 2vh 40px;
+            padding: 2vh 40px 6vh 40px;
+            /* Increased bottom padding to 6vh for a better gap above footer */
             display: grid;
             gap: 20px;
         }
 
         .next-container {
             background-color: var(--next-bg);
-            padding: 20px;
+            height: 12vh;
+            flex-shrink: 0;
+            /* Prevents the Next section from being squashed by the serving area */
+            padding: 10px 20px;
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            justify-content: center;
+            gap: 5px;
         }
 
         .next-label {
@@ -183,9 +220,10 @@
 
         .next-list {
             display: flex;
-            flex-direction: column;
-            gap: 8px;
+            flex-direction: row;
+            gap: 10px;
             align-items: center;
+            justify-content: center;
         }
 
         .next-item {
@@ -193,6 +231,10 @@
             font-weight: 700;
             color: #F8F9FA;
         }
+
+        /* --- FOOTER SECTION STYLES --- 
+           Small bar at the bottom with the scrolling/static message.
+        */
 
         /* --- Footer --- */
         footer {
@@ -248,21 +290,29 @@
     </footer>
 
     <script>
+        /* 
+           CONFIG: This object stores the main settings for the application.
+           Think of it like the "Settings" menu in an app.
+        */
         const CONFIG = {
-            SUPABASE_URL: 'https://oofytczjvpkjbivhwhca.supabase.co',
-            SUPABASE_KEY: 'sb_publishable_IL4q6Yn14gYVadx-qbXxkg_QV92YPpe',
-            DEPARTMENT_ID: 'd55ec19e-759e-48ae-a8c6-380cf9650ca7',
-            ROOMS_PER_PAGE: 6,
-            GRID_COLUMNS: 6, // Number of columns in the grid
-            SCROLL_INTERVAL: 10000,
-            LANG_INTERVAL: 150000000,
-            POLLING_INTERVAL: 15000,
-            START_LANG: 'hi'
+            SUPABASE_URL: 'https://oofytczjvpkjbivhwhca.supabase.co',      // URL for our database
+            SUPABASE_KEY: 'sb_publishable_IL4q6Yn14gYVadx-qbXxkg_QV92YPpe', // Security key for our database
+            DEPARTMENT_ID: 'd55ec19e-759e-48ae-a8c6-380cf9650ca7',          // Which department's data to show
+            ROOMS_PER_PAGE: 5,      // How many room boxes to show at once on the screen
+            GRID_COLUMNS: 5,        // How many columns to use in the grid layout
+            SCROLL_INTERVAL: 10000, // How long to wait before sliding to the next page (10 seconds)
+            LANG_INTERVAL: 150000000, // How long to wait before switching languages (currently set very high)
+            POLLING_INTERVAL: 15000,  // How often to check for updates from the database (15 seconds)
+            START_LANG: 'en',          // The language the app starts in ('hi' for Hindi, 'en' for English)
+            TOKEN_ROTATION_INTERVAL: 3000 // How often to switch between multiple "Now Serving" tokens (3 seconds)
         };
 
+        /* 
+           TRANSLATIONS: This stores all the text in both English (en) and Hindi (hi).
+        */
         const TRANSLATIONS = {
             en: {
-                nowServing: "Now Serving",
+                nowServing: "Serving",
                 next: "Next",
                 footer: "Please Wait for Your Token Number to be Called",
                 room: "Room"
@@ -275,10 +325,18 @@
             }
         };
 
+        /* 
+           toHindiDigits: A helper function that converts standard numbers (1, 2, 3) 
+           into Hindi numbers (१, २, ३).
+        */
         function toHindiDigits(n) {
             const hindiDigits = ['०', '१', '२', '३', '४', '५', '६', '७', '८', '९'];
             return String(n).split('').map(c => hindiDigits[parseInt(c)] || c).join('');
         }
+
+        /* 
+           STATE: These variables keep track of what's happening in the app right now.
+        */
 
         let currentLang = CONFIG.START_LANG;
         let currentPage = 0;
@@ -287,8 +345,14 @@
         let departmentName = '';
         let isInitialLoad = true;
         let lastTokensJson = '';
+        let servingIndices = {}; // Keeps track of which token to show for each room when multiple are serving
 
+        /* Initialize the Supabase Client: This connects our code to the database */
         const supabaseClient = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
+
+        /* 
+           fetchRoomsAndDept: Fetches the Department Name and the list of Rooms from the database.
+        */
 
         async function fetchRoomsAndDept() {
             const { data: dept } = await supabaseClient.from('departments')
@@ -313,6 +377,9 @@
             render();
         }
 
+        /* 
+           fetchTokens: Fetches the actual patient token numbers (who is waiting, who is with the doctor).
+        */
         async function fetchTokens() {
             const { data } = await supabaseClient
                 .from('token_details')
@@ -326,6 +393,7 @@
             if (newJson !== lastTokensJson) {
                 tokens = data || [];
                 lastTokensJson = newJson;
+                servingIndices = {}; // Reset rotation indices when tokens are updated to show the latest data
                 render();
             }
         }
@@ -337,12 +405,12 @@
 
         function getDynamicFontSize(str) {
             const len = str.length;
-            if (len <= 3) return '12rem';
-            if (len <= 5) return '8rem';
-            if (len <= 8) return '6rem';
-            if (len <= 12) return '5rem';
-            if (len <= 16) return '4rem';
-            return '2.2rem';
+            if (len <= 3) return '16rem';
+            if (len <= 5) return '11rem';
+            if (len <= 8) return '9rem';
+            if (len <= 12) return '10rem';
+            if (len <= 16) return '8rem';
+            return '4rem';
         }
 
         function getDeptFontSize(str) {
@@ -351,6 +419,10 @@
             return '2.8rem';
         }
 
+        /* 
+           render: This is the most important function. It takes all the data we fetched 
+           and creates the HTML that shows up on the screen.
+        */
         function render(targetId = 'grid-primary') {
             if (isInitialLoad) return;
 
@@ -377,10 +449,21 @@
             const fragment = document.createDocumentFragment();
 
             roomsToShow.forEach(room => {
+                // Find all tokens currently with the doctor (in_consultation) in this room
                 const serving = tokens.filter(t => t.room_id === room.room_id && t.status === 'in_consultation');
-                const next = tokens.filter(t => t.room_id === room.room_id && ['waiting', 'pending'].includes(t.status)).slice(0, 3);
 
-                const servingNumbers = serving.map(t => t.token_number).join(', ') || '---';
+                // Get the index of the token we should currently show (for rotation)
+                let currentIndex = servingIndices[room.room_id] || 0;
+
+                // If the index is out of bounds (e.g. token removed), reset to 0
+                if (currentIndex >= serving.length) currentIndex = 0;
+                servingIndices[room.room_id] = currentIndex;
+
+                // Pick only ONE token to show
+                const currentServingToken = serving[currentIndex];
+                const servingNumber = currentServingToken ? currentServingToken.token_number : '';
+
+                const next = tokens.filter(t => t.room_id === room.room_id && ['waiting', 'pending'].includes(t.status)).slice(0, 3);
 
                 const tile = document.createElement('div');
                 tile.className = 'tile';
@@ -389,14 +472,16 @@
                     <div class="tile-header">${t.room} ${currentLang === 'hi' ? toHindiDigits(room.room_number) : room.room_number}</div>
                     <div class="serving-container">
                         <div class="serving-label">${t.nowServing}</div>
-                        <div class="serving-number" style="font-size:${getDynamicFontSize(servingNumbers)}">
-                            ${currentLang === 'hi' ? toHindiDigits(servingNumbers) : servingNumbers}
+                        <div class="serving-number" style="font-size: 14rem">
+                            ${currentLang === 'hi' ? toHindiDigits(servingNumber) : servingNumber}
                         </div>
                     </div>
                     <div class="next-container">
                         <div class="next-label">${t.next}</div>
                         <div class="next-list">
-                            ${next.map(n => `<div class="next-item">${currentLang === 'hi' ? toHindiDigits(n.token_number) : n.token_number}</div>`).join('') || '<div class="next-item">---</div>'}
+                            <div class="next-item">
+                                ${next.map(n => (currentLang === 'hi' ? toHindiDigits(n.token_number) : n.token_number)).join(', ') || '---'}
+                            </div>
                         </div>
                     </div>
                 `;
@@ -407,6 +492,9 @@
             grid.appendChild(fragment);
         }
 
+        /* 
+           transitionPage: Handles the sliding animation when moving from one page of rooms to the next.
+        */
         async function transitionPage() {
             const activeRooms = rooms.filter(r => r.status === 'active' && tokens.some(t => t.room_id === r.room_id));
             const totalPages = Math.ceil(activeRooms.length / CONFIG.ROOMS_PER_PAGE);
@@ -433,11 +521,26 @@
             }, 1000); // match CSS transition duration
         }
 
-        setInterval(updateClock, 1000);
-        setInterval(fetchTokens, CONFIG.POLLING_INTERVAL);
+        setInterval(updateClock, 1000); // Update the clock every second
+        setInterval(fetchTokens, CONFIG.POLLING_INTERVAL); // Fetch updates every 15 seconds
 
-        // Auto-scroll logic with smooth transition
+        // Auto-scroll logic with smooth transition: Slides to the next page of rooms
         setInterval(transitionPage, CONFIG.SCROLL_INTERVAL);
+
+        /* 
+           rotateServingTokens: Increments the display index for each room's serving tokens 
+           and re-renders the grid to show the next one.
+        */
+        function rotateServingTokens() {
+            rooms.forEach(room => {
+                const serving = tokens.filter(t => t.room_id === room.room_id && t.status === 'in_consultation');
+                if (serving.length > 1) {
+                    servingIndices[room.room_id] = ((servingIndices[room.room_id] || 0) + 1) % serving.length;
+                }
+            });
+            render();
+        }
+        setInterval(rotateServingTokens, CONFIG.TOKEN_ROTATION_INTERVAL);
 
         // Language switching logic with fast transition
         setInterval(() => {
@@ -463,6 +566,10 @@
             }, 10); // Ultra-fast fade out
         }, CONFIG.LANG_INTERVAL);
 
+        /* 
+           Real-time Subscription: This tells the app to listen for any changes 
+           in the 'token_details' table and update immediately if someone is called.
+        */
         supabaseClient.channel('token-updates')
             .on('postgres_changes', {
                 event: '*',
